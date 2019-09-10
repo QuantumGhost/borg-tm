@@ -95,6 +95,7 @@ func (b BorgBackup) Run(ctx context.Context) error {
 
 func (b BorgBackup) createSnapshot() error {
 	cmd := exec.Command(tmUtilCmd, "localsnapshot")
+	cmd.Env = safeEnvs()
 	err := errors.Wrap(cmd.Run(), "error while creating snapshot")
 	return err
 }
@@ -103,6 +104,7 @@ func (b BorgBackup) getLatestSnapshot() (string, error) {
 	cmd := exec.Command(tmUtilCmd, "listlocalsnapshots", "/")
 	buf := new(bytes.Buffer)
 	cmd.Stdout = buf
+	cmd.Env = safeEnvs()
 	err := errors.Wrap(cmd.Run(), "error while getting latest snapshot")
 	if err != nil {
 		return "", err
@@ -127,6 +129,7 @@ func (b BorgBackup) mountSnapshot(snapshot string) error {
 	cmd := exec.Command("mount", "-t", "apfs", "-r", "-o", "-s="+snapshot, "/", b.mountpoint)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+	cmd.Env = safeEnvs()
 	return errors.Wrap(cmd.Run(), "error while mounting snapshot")
 }
 
@@ -136,6 +139,7 @@ func removeSnapshot(name string) error {
 		return errors.WithStack(unrecognizedSnapshotName)
 	}
 	cmd := exec.Command(tmUtilCmd, "deletelocalsnapshots", parts[3])
+	cmd.Env = safeEnvs()
 	return errors.Wrap(cmd.Run(), "error while removing snapshot "+name)
 }
 
@@ -165,4 +169,11 @@ func (b BorgBackup) invokeBorg(ctx context.Context, archiveName string) error {
 		return errors.Wrap(err, "error while running borg")
 	}
 	return nil
+}
+
+// remove borg related environment variables
+func safeEnvs() []string {
+	envs := os.Environ()
+	envs = append(envs, "BORG_PASSPHRASE=", "BORG_REPO=")
+	return envs
 }
